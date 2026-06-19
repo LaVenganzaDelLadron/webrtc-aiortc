@@ -7,6 +7,14 @@ This project has two WebRTC examples:
 
 The browser call is the recommended way to test audio and video because the browser handles camera, microphone, speakers, and video display safely.
 
+## Features
+
+- Room-based WebRTC signaling so two browsers can connect using the same room name.
+- Automatic unique client IDs generated for each browser tab or device.
+- Live status updates for waiting, connecting, and disconnecting peers.
+- Mute, camera toggle, and hang-up controls during a call.
+- Clear guidance for HTTPS access when testing from a LAN IP address.
+
 ## Requirements
 
 - Python 3.9 or newer
@@ -85,7 +93,7 @@ Use one of these instead:
 
 - Run locally on your laptop with `uvicorn` for same-Wi-Fi testing.
 - Deploy the FastAPI app to a persistent server host such as Render, Railway, Fly.io, or a VPS.
-- Keep Vercel for the frontend only, then point `static/app.js` to a separate WebSocket signaling backend.
+- Keep Vercel for the frontend only, then point the frontend to a separate WebSocket signaling backend.
 
 ## Browser Call Controls
 
@@ -128,19 +136,15 @@ It contains:
 - A remote video element.
 - Mute, camera, and hangup buttons.
 
-### `static/app.js`
+### Browser JavaScript modules
 
-`static/app.js` is the browser WebRTC code.
+The browser logic is split across several files in `static/js`:
 
-It does these steps:
-
-1. Gets your camera and microphone with `navigator.mediaDevices.getUserMedia`.
-2. Shows your own camera in the local video box.
-3. Connects to the FastAPI WebSocket.
-4. Creates an `RTCPeerConnection`.
-5. Adds your camera and microphone tracks to the peer connection.
-6. Exchanges WebRTC setup messages with the other browser.
-7. Shows the other browser's stream in the remote video box.
+- `state.js` stores the shared app state, DOM references, and the generated client ID.
+- `signaling.js` opens the WebSocket URL and sends/receives signaling messages.
+- `webrtc.js` creates peer connections, handles offers/answers, shares ICE candidates, and closes connections.
+- `ui.js` wires up the join, mute, camera, and hang-up buttons.
+- `media.js` requests camera and microphone permission and starts or stops local tracks.
 
 The setup messages are:
 
