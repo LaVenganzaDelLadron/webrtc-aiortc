@@ -11,10 +11,17 @@ const clientId = createClientId();
 const peerConnections = new Map();
 const pendingCandidates = new Map();
 const offeredPeers = new Set();
+const peerConnectionConfig = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+  ],
+};
 
 let socket = null;
 let localStream = null;
 let joinedRoom = null;
+let peerWaitTimer = null;
 
 function createClientId() {
   if (window.crypto && window.crypto.randomUUID) {
@@ -52,6 +59,15 @@ function enableCallControls(enabled) {
   hangupButton.disabled = !enabled;
 }
 
+function startPeerWaitTimer() {
+  clearTimeout(peerWaitTimer);
+  peerWaitTimer = setTimeout(() => {
+    if (peerConnections.size === 0) {
+      setStatus("Still waiting for another peer. If this is deployed on Vercel, the WebSocket signaling server is probably not running.");
+    }
+  }, 8000);
+}
+
 function shouldCreateOffer(peerId) {
   return clientId > peerId;
 }
@@ -79,10 +95,16 @@ async function joinRoom(room) {
   socket.addEventListener("open", () => {
     setStatus(`Joined room "${room}". Waiting for another peer...`);
     enableCallControls(true);
+    startPeerWaitTimer();
   });
   socket.addEventListener("message", handleSignalMessage);
+  socket.addEventListener("error", () => {
+    setStatus("Signaling WebSocket failed. Deploy this app on a host that supports long-running WebSockets.");
+  });
   socket.addEventListener("close", () => {
-    setStatus("Disconnected from signaling server.");
+    if (joinedRoom) {
+      setStatus("Disconnected from signaling server. On Vercel, FastAPI WebSockets will not work for this call server.");
+    }
   });
 }
 
@@ -134,8 +156,9 @@ function createPeerConnection(peerId) {
     return peerConnections.get(peerId);
   }
 
-  const pc = new RTCPeerConnection();
+  const pc = new RTCPeerConnection(peerConnectionConfig);
   peerConnections.set(peerId, pc);
+  clearTimeout(peerWaitTimer);
 
   for (const track of localStream.getTracks()) {
     pc.addTrack(track, localStream);
@@ -159,6 +182,12 @@ function createPeerConnection(peerId) {
     }
     if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
       setStatus(`Peer connection ${pc.connectionState}.`);
+    }
+  });
+
+  pc.addEventListener("iceconnectionstatechange", () => {
+    if (pc.iceConnectionState === "failed") {
+      setStatus("Network connection failed. A TURN server may be needed if the devices are on different networks.");
     }
   });
 
@@ -256,6 +285,7 @@ function hangUp() {
   localVideo.srcObject = null;
   remoteVideo.srcObject = null;
   joinedRoom = null;
+  clearTimeout(peerWaitTimer);
   joinForm.querySelector("button").disabled = false;
   enableCallControls(false);
   setStatus("Call ended.");

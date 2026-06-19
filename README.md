@@ -75,6 +75,18 @@ https://192.168.1.14:8000
 
 Your browser may warn that the certificate is self-signed. Accept the warning for local testing.
 
+## Deployment note
+
+This project uses FastAPI WebSockets for call signaling. The page can be hosted as static files anywhere, but the `/ws/{room_id}/{client_id}` signaling route must run on a server that supports long-running WebSocket connections and shared in-memory room state.
+
+Do not use Vercel serverless as the only backend for this version of the app. On Vercel, the page may load, camera permission may work, and both users may join the same room, but the WebSocket signaling server will not behave like the local `uvicorn` server. The result is usually a black remote video area or both peers waiting forever.
+
+Use one of these instead:
+
+- Run locally on your laptop with `uvicorn` for same-Wi-Fi testing.
+- Deploy the FastAPI app to a persistent server host such as Render, Railway, Fly.io, or a VPS.
+- Keep Vercel for the frontend only, then point `static/app.js` to a separate WebSocket signaling backend.
+
 ## Browser Call Controls
 
 - **Mute** turns your microphone track off.
@@ -182,6 +194,7 @@ QT_QPA_PLATFORM=wayland .venv/bin/python server.py --window
 
 - If the browser does not ask for camera or microphone permission, check browser site permissions.
 - If you open the app with a LAN IP like `http://192.168.1.14:8000`, camera and microphone will be blocked. Use HTTPS for LAN IPs.
+- If the deployed Vercel page shows black remote video, the signaling WebSocket is probably not running as a persistent server. Run the FastAPI app with `uvicorn` or deploy it to a WebSocket-capable backend.
 - If two devices cannot connect, make sure both devices can reach the server URL.
 - If the `uvicorn` command mentions a different project path, reinstall the launcher:
 
