@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WebRTC Audio and Video Call</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main class="app">
+      <section class="setup" id="setupPanel">
+        <div>
+          <h1>WebRTC Call</h1>
+          <p>Join the same room from two browser tabs or two devices.</p>
+        </div>
+
+        <form id="joinForm" class="join-form">
+          <label for="roomInput">Room</label>
+          <div class="join-row">
+            <input id="roomInput" name="room" value="demo-room" autocomplete="off">
+            <button type="submit">Join</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="stage">
+        <div class="video-wrap remote">
+          <video id="remoteVideo" autoplay playsinline></video>
+          <span>Remote</span>
+        </div>
+
+        <div class="video-wrap local">
+          <video id="localVideo" autoplay muted playsinline></video>
+          <span>You</span>
+        </div>
+      </section>
+
+      <section class="controls">
+        <button id="muteButton" type="button" disabled>Mute</button>
+        <button id="cameraButton" type="button" disabled>Camera Off</button>
+        <button id="hangupButton" type="button" class="danger" disabled>Hang Up</button>
+      </section>
+
+      <p id="status" class="status">Ready to join.</p>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

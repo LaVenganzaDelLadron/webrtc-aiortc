@@ -1,39 +1,26 @@
-# WebRTC Screen Sharing with aiortc
+# WebRTC Audio, Video, and Screen Sharing
 
-This project is a small WebRTC-based screen-sharing demo. It lets one peer capture its screen and send the stream to another peer, while a lightweight signaling server coordinates the connection setup.
+This project has two WebRTC examples:
 
-## Purpose
+- A browser-based two-way audio/video call.
+- A Python screen-sharing demo using `aiortc`, MSS, and OpenCV.
 
-The app demonstrates how to:
-- capture the screen using MSS
-- stream video over WebRTC with aiortc
-- exchange connection details through a WebSocket signaling server
-- display the remote stream with OpenCV
+The browser call is the recommended way to test audio and video because the browser handles camera, microphone, speakers, and video display safely.
 
 ## Requirements
 
-Before running the project, make sure you have:
 - Python 3.9 or newer
-- `pip` installed
-- a working display environment (Linux, macOS, or Windows)
-- access to a terminal to run the scripts
+- `pip`
+- A browser with WebRTC support, such as Chrome, Chromium, Firefox, or Edge
+- Camera and microphone permission in the browser
 
 ## Installation
-
-### Option 1: Automated setup (recommended)
-
-Run:
 
 ```bash
 bash install.sh
 ```
 
-The script will:
-1. create a virtual environment named `.venv`
-2. upgrade `pip`
-3. install all dependencies from `requirements.txt`
-
-### Option 2: Manual setup
+Manual setup:
 
 ```bash
 python3 -m venv .venv
@@ -41,55 +28,183 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## How to use
+## Run the Browser Audio/Video Call
 
-### 1. Start the signaling server
-
-From one terminal:
+Start the FastAPI server:
 
 ```bash
-python main.py
+.venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-This runs the FastAPI server that relays WebRTC signaling messages.
+Open this page in two browser tabs or on two devices:
 
-### 2. Start the receiver
+```text
+http://localhost:8000
+```
 
-From a second terminal:
+Use the same room name in both tabs, then click **Join**. The browser will ask for camera and microphone permission. After both sides join, each browser should show local video and remote video.
+
+For another device on the same network, the browser needs HTTPS before it allows camera and microphone access on a LAN IP address.
+
+Create a local certificate:
 
 ```bash
-python server.py
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout localhost.key \
+  -out localhost.crt \
+  -days 365 \
+  -subj "/CN=192.168.1.14" \
+  -addext "subjectAltName=IP:192.168.1.14,DNS:localhost"
 ```
 
-This peer waits for the offer and displays the remote screen.
-
-### 3. Start the sender
-
-From a third terminal:
+Start the server with HTTPS:
 
 ```bash
-python client.py
+.venv/bin/python -m uvicorn main:app \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --ssl-keyfile localhost.key \
+  --ssl-certfile localhost.crt
 ```
 
-This peer captures the screen and sends it to the receiver.
+Then open this URL from the other device:
 
-## Project files
+```text
+https://192.168.1.14:8000
+```
 
-- [main.py](main.py) — FastAPI signaling server
-- [client.py](client.py) — sender peer that captures and streams the screen
-- [server.py](server.py) — receiver peer that displays the screen
-- [screem_track.py](screem_track.py) — screen-capture track implementation
-- [requirements.txt](requirements.txt) — Python dependencies
-- [install.sh](install.sh) — automated setup script
+Your browser may warn that the certificate is self-signed. Accept the warning for local testing.
 
-## Notes
+## Browser Call Controls
 
-- The sender and receiver communicate through the WebSocket server in [main.py](main.py).
-- The capture logic is implemented in [screem_track.py](screem_track.py).
-- Press `q` while the display window is focused to stop the viewer.
+- **Mute** turns your microphone track off.
+- **Unmute** turns your microphone track back on.
+- **Camera Off** turns your camera video track off.
+- **Camera On** turns your camera video track back on.
+- **Hang Up** closes the peer connection and stops your camera and microphone.
+
+## How the Browser Call Works
+
+### `main.py`
+
+`main.py` is the FastAPI server.
+
+It does two jobs:
+
+- Serves the browser page at `/`.
+- Relays WebRTC signaling messages through WebSockets.
+
+The browser call uses this WebSocket path:
+
+```text
+/ws/{room_id}/{client_id}
+```
+
+The server stores connected clients by room. When a browser joins, the server sends a `peer-list` message so each browser knows who else is in the room.
+
+The server does not process camera or microphone data. It only passes setup messages between browsers.
+
+### `static/index.html`
+
+`static/index.html` is the call page.
+
+It contains:
+
+- A room input.
+- A join button.
+- A local video element.
+- A remote video element.
+- Mute, camera, and hangup buttons.
+
+### `static/app.js`
+
+`static/app.js` is the browser WebRTC code.
+
+It does these steps:
+
+1. Gets your camera and microphone with `navigator.mediaDevices.getUserMedia`.
+2. Shows your own camera in the local video box.
+3. Connects to the FastAPI WebSocket.
+4. Creates an `RTCPeerConnection`.
+5. Adds your camera and microphone tracks to the peer connection.
+6. Exchanges WebRTC setup messages with the other browser.
+7. Shows the other browser's stream in the remote video box.
+
+The setup messages are:
+
+- `offer`: one browser asks to start a call.
+- `answer`: the other browser accepts the call.
+- `ice-candidate`: browsers share network connection options.
+- `leave`: one browser left the call.
+
+The actual audio and video flow directly through WebRTC. The FastAPI server is only the messenger that helps the browsers find and connect to each other.
+
+### `static/style.css`
+
+`static/style.css` controls the page layout and colors. It keeps the remote video large, the local preview smaller, and the buttons easy to use.
+
+## Run the Python Screen-Share Demo
+
+The older Python screen-share demo is still available.
+
+Start the signaling server:
+
+```bash
+.venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Start the receiver:
+
+```bash
+.venv/bin/python server.py
+```
+
+Start the sender:
+
+```bash
+.venv/bin/python client.py
+```
+
+On GNOME Wayland, the receiver defaults to headless mode because OpenCV's Qt window can be killed by the desktop session. To try the native OpenCV window anyway, run:
+
+```bash
+QT_QPA_PLATFORM=wayland .venv/bin/python server.py --window
+```
+
+## Python Screen-Share Files
+
+- `client.py` creates a WebRTC offer and sends the screen track.
+- `server.py` receives the screen track and can display it with OpenCV.
+- `sharescreen/screen_track.py` captures the screen using MSS and converts frames for WebRTC.
+- `main.py` keeps the old `/ws/{client_id}` route so the Python screen-share scripts still work.
 
 ## Troubleshooting
 
-- If the import fails, make sure [client.py](client.py) uses the correct module name.
-- If the connection does not start, ensure [main.py](main.py) is running before launching the peers.
-- If the video window does not appear, check that your display environment is working correctly.
+- If the browser does not ask for camera or microphone permission, check browser site permissions.
+- If you open the app with a LAN IP like `http://192.168.1.14:8000`, camera and microphone will be blocked. Use HTTPS for LAN IPs.
+- If two devices cannot connect, make sure both devices can reach the server URL.
+- If the `uvicorn` command mentions a different project path, reinstall the launcher:
+
+  ```bash
+  .venv/bin/python -m pip install --force-reinstall uvicorn
+  ```
+
+- If the Python OpenCV window fails on Wayland, use the browser call for audio/video or run the receiver headless:
+
+  ```bash
+  .venv/bin/python server.py --headless
+  ```
+
+## Quick Checks
+
+Compile the Python files:
+
+```bash
+.venv/bin/python -m py_compile main.py client.py server.py sharescreen/screen_track.py
+```
+
+Check the FastAPI app imports:
+
+```bash
+.venv/bin/python -c "import main; print('main import ok')"
+```

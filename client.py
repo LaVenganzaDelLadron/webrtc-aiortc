@@ -3,7 +3,7 @@ import json
 import websockets
 
 from aiortc import RTCPeerConnection, RTCSessionDescription
-from screen_track import ScreenTrack
+from sharescreen.screen_track import ScreenTrack
 
 SIGNAL = "ws://localhost:8000/ws/clientA"
 TARGET = "clientB"
