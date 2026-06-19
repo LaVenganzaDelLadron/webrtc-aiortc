@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+websockets
+aiortc
+opencv-python
+numpy
+mss
+av
